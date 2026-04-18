@@ -1,31 +1,36 @@
 from dataclasses import dataclass
 from typing import List
-from utils.binary_reader import BinaryReader
 from io import BytesIO
+from utils.binary_reader import BinaryReader
+
 
 @dataclass
-class EntityRecord:
-  value1: int
-  value2: int
-  value3: int
-  type: int
-  unknown: int
+class SpecialLocation:
+    x: int
+    z: int
+    y: int
+    type_code: int
+    extra: int
+
 
 @dataclass(init=False)
 class Section35:
-  records: List[EntityRecord]
+    locations: List[SpecialLocation]
 
-  def __init__(self, stream: BytesIO):
-    self.records = self.parse_records(stream)
+    def __init__(self, stream: BytesIO):
+        self.locations = self.parse_locations(stream)
 
-  def parse_records(self, stream: BytesIO) -> List[EntityRecord]:
-    record_count = len(stream.getbuffer()) // 12
-    records: List[EntityRecord] = []
-    for _ in range(record_count):
-      value1 = BinaryReader.read_int32(stream)
-      value2 = BinaryReader.read_int32(stream)
-      value3 = BinaryReader.read_int16(stream)
-      entity_type = BinaryReader.read_uint8(stream)
-      unknown = BinaryReader.read_int8(stream)
-      records.append(EntityRecord(value1=value1, value2=value2, value3=value3, type=entity_type, unknown=unknown))
-    return records
+    def parse_locations(self, stream: BytesIO) -> List[SpecialLocation]:
+        record_count = len(stream.getbuffer()) // 12
+        locations: List[SpecialLocation] = []
+        for _ in range(record_count):
+            x = BinaryReader.read_int32(stream)
+            z = BinaryReader.read_int32(stream)
+            y = BinaryReader.read_int16(stream)
+            type_code = BinaryReader.read_uint8(stream)
+            extra = BinaryReader.read_int8(stream)
+            locations.append(SpecialLocation(
+                x=x, z=z, y=y,
+                type_code=type_code, extra=extra,
+            ))
+        return locations

@@ -149,17 +149,17 @@ def process_file(filepath: str) -> None:
     print("Section 31: Location Names")
     location_names = Section31(file_header.sections[31])
     
-    print("Section 32: Unknown light related")
-    unknown_light_related = Section32(file_header.sections[32])
-    
-    print("Section 33: Unknown")
-    section_33 = Section33(file_header.sections[33])
+    print("Section 32: Sky/Fog Color Zones")
+    sky_color_zones = Section32(file_header.sections[32])
+
+    print("Section 33: Text Templates (dialog composer)")
+    text_templates = Section33(file_header.sections[33])
 
     print("Section 34: Draw Points")
     draw_points = Section34(file_header.sections[34])
-    
-    print("Section 35: Unknown")
-    section_35 = Section35(file_header.sections[35])
+
+    print("Section 35: Special Locations (save/GF/warp points)")
+    special_locations = Section35(file_header.sections[35])
     
     print("Section 36: Event Scripts")
     event_scripts = Section36(file_header.sections[36])
@@ -170,32 +170,32 @@ def process_file(filepath: str) -> None:
     print("Section 38: Road/Tracks textures")
     road_tracks_textures = Section38(file_header.sections[38])
 
-    print("Section 39: ONE World Map texture")
+    print("Section 39: A World Map texture")
     one_world_map_texture = Section39(file_header.sections[39]) # likely PSX specific disk read workaround
 
-    print("Section 40: Unknown")
-    section_40 = Section40(file_header.sections[40])
+    print("Section 40: Palette (CLUT) Animations")
+    palette_animations = Section40(file_header.sections[40])
 
     print("Section 41: Object Textures")
     object_textures = Section41(file_header.sections[41])
 
     print("Section 42: AKAO Sound/Music")
-    section_42 = Section42(file_header.sections[42])
+    music_section_42 = Section42(file_header.sections[42])
 
-    print("Section 43: AKAO Music")
-    section_43 = Section43(file_header.sections[43])
+    print("Section 43: AKAO Sound/Music")
+    music_section_43 = Section43(file_header.sections[43])
 
     print("Section 44: AKAO Sound/Music")
-    section_44 = Section44(file_header.sections[44])
+    music_section_44 = Section44(file_header.sections[44])
 
     print("Section 45: AKAO Sound/Music")
-    section_45 = Section45(file_header.sections[45])
+    music_section_45 = Section45(file_header.sections[45])
 
     print("Section 46: AKAO Sound/Music")
-    section_46 = Section46(file_header.sections[46])
+    music_section_46 = Section46(file_header.sections[46])
 
     print("Section 47: AKAO Sound/Music")
-    section_47 = Section47(file_header.sections[47])
+    music_section_47 = Section47(file_header.sections[47])
 
     print("Exporting models and textures...")
     for i, model in enumerate(models.models):

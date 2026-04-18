@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 from io import BytesIO
 from utils.binary_reader import BinaryReader
 from .opcodes import OPCODES
