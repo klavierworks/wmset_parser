@@ -21,10 +21,14 @@ class Section15:
         blank_space = BinaryReader.read_uint16(stream) ## padding, I see a 15 is one of the values here, unsure why
         if offset == 0:
             break
-        ## This catches the bad value in my wmsetus.obj. Worth checking why this exists
         if blank_space != 0:
-            print(f"Warning: Expected padding to be 0, got {blank_space} at offset {stream.tell()-2}")
-            continue
+          if blank_space == 15:
+            print(f"Note: Found expected padding value 15 at offset {stream.tell()-2}. This is possibly a legacy model as it is also unable to be parsed the same way.")
+          else:
+            print(f"Warning: Expected padding to be 0, got {blank_space} at offset {stream.tell()-2}. Offset: {offset}")
+          
+          print("Ignoring.")
+          continue
         offsets.append(offset)
     return offsets
 
