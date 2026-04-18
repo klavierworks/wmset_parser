@@ -1,4 +1,5 @@
 from file_header import FileHeader
+import file_header
 from sections.section_0 import Section0
 from sections.section_1 import Section1
 from sections.section_2 import Section2
@@ -29,9 +30,17 @@ from sections._unused_section_26 import UnusedSection26
 from sections._unused_section_27 import UnusedSection27
 from sections.section_28 import Section28
 from sections.section_29 import Section29
+from sections.section_30 import Section30
 from sections.section_31 import Section31
+from sections.section_32 import Section32
+from sections.section_33 import Section33
 from sections.section_34 import Section34
+from sections.section_35 import Section35
 from sections.section_36 import Section36
+from sections.section_37 import Section37
+from sections.section_38 import Section38
+from sections.section_39 import Section39
+from sections.section_40 import Section40
 from sections.section_41 import Section41
 import os
 
@@ -124,19 +133,43 @@ def process_file(filepath: str) -> None:
     UnusedSection27(file_header.sections[27])
 
     print("Section 28: Water Block")
-    water_block = Section28(file_header.sections[28])
+    water_block = Section28(file_header.sections[28]) # likely PSX specific disk read workaround
 
     print("Section 29: Animation Frame Data")
     animation_frame_data = Section29(file_header.sections[29])
+    
+    print("Section 30: Animation Descriptors?")
+    animation_descriptors = Section30(file_header.sections[30])
 
     print("Section 31: Location Names")
     location_names = Section31(file_header.sections[31])
+    
+    print("Section 32: Unknown light related")
+    unknown_light_related = Section32(file_header.sections[32])
+    
+    print("Section 33: Unknown")
+    section_33 = Section33(file_header.sections[33])
 
     print("Section 34: Draw Points")
     draw_points = Section34(file_header.sections[34])
-
+    
+    print("Section 35: Unknown")
+    section_35 = Section35(file_header.sections[35])
+    
     print("Section 36: Event Scripts")
     event_scripts = Section36(file_header.sections[36])
+    
+    print("Section 37: World Map textures")
+    world_map_textures = Section37(file_header.sections[37])
+    
+    print("Section 38: Road/Tracks textures")
+    road_tracks_textures = Section38(file_header.sections[38])
+
+    print("Section 39: ONE World Map texture")
+    one_world_map_texture = Section39(file_header.sections[39]) # likely PSX specific disk read workaround
+
+    print("Section 40: Unknown")
+    section_40 = Section40(file_header.sections[40])
 
     print("Section 41: Object Textures")
     object_textures = Section41(file_header.sections[41])
