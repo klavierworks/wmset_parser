@@ -3,4 +3,4 @@ from .generic_script_section import GenericScriptSection
 
 @dataclass(init=False)
 class Section7(GenericScriptSection):
-  name: str = "Extends generic scripts"
+    pass

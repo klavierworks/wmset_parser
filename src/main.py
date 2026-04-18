@@ -1,4 +1,5 @@
 from file_header import FileHeader
+from sections.section_10 import Section10
 from sections.section_16 import Section16
 from sections.section_7 import Section7
 from sections.section_9 import Section9
@@ -26,42 +27,45 @@ def process_file(filepath: str) -> None:
         print(f"Offset {i}: {offset}")
 
     ## Remember, zero indexed! Section 13 in Wiki is section 12 here.
-    scripts7 = Section7(file_header.sections[7])
-    print("Scripts section 7:")
+    print("Section 7: Player Location Scripts")
+    player_location_scripts = Section7(file_header.sections[7])
 
-    scripts9 = Section9(file_header.sections[9])
-    print("Scripts section 9:")
-  
-    ## I believe Section10 is entity data
+    print("Section 9: Entity Spawn Scripts")
+    entity_spawn_scripts = Section9(file_header.sections[9])
 
-    scripts11 = Section11(file_header.sections[11])
+    print(f"Section 10: Entity Spawn Positions")
+    entity_spawn_positions = Section10(file_header.sections[10])
 
+    print("Section 11: Vehicle Warp Scripts")
+    vehicle_warp_scripts = Section11(file_header.sections[11])
+    
+    print("Section 13: Dialog Texts")
     dialog_text = Section13(file_header.sections[13])
-    print("Dialog Texts:")
-    #for text in dialog_text.dialog:
-        #print(f" - {text}")
 
+    print(f"Section 15: Models")
     models = Section15(file_header.sections[15])
+    print(f"Models: {len(models.models)} model(s)")
 
-    print("Section 16:")
+    print("Section 16: Unknown")
     unknown = Section16(file_header.sections[16])
 
+    print("Section 31: Location Names")
     location_names = Section31(file_header.sections[31])
-    print("Location Names:")
-    #for name in location_names.location_names:
-      #print(f" - {name}")
 
+    print("Section 34: Draw Points")
     draw_points = Section34(file_header.sections[34])
 
+    print("Section 41: Object Textures")
     object_textures = Section41(file_header.sections[41])
     
+    print("Exporting models and textures...")
     for i, model in enumerate(models.models):
       texture = object_textures.textures[i]
       #Section15.export_model_to_obj(model, f"../output/models/model_{i}.obj", texture)
       #texture.save_png(f"../output/textures/texture_{i}.png")
       #print(f"Exported model_{i}.obj with texture_{i}.png")
 
-    scripts36 = Section36(file_header.sections[36])
+    event_scripts = Section36(file_header.sections[36])
 
 if __name__ == "__main__":
   test_file_path = "../wmsetus.obj"
