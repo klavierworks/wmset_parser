@@ -16,9 +16,9 @@ class Section10:
     positions: List[EntityPosition]
 
     def __init__(self, stream: BytesIO) -> None:
-        self.positions = self._parse_positions(stream)
+        self.positions = self.parse_positions(stream)
 
-    def _parse_positions(self, stream: BytesIO) -> List[EntityPosition]:
+    def parse_positions(self, stream: BytesIO) -> List[EntityPosition]:
         record_count = len(stream.getbuffer()) // 16 ## note: divide to int
         positions: List[EntityPosition] = []
         stream.seek(0)

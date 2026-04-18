@@ -1,62 +1,67 @@
 from dataclasses import dataclass
-from typing import List
-from utils.binary_reader import BinaryReader
+from typing import List, Optional
 from io import BytesIO
+from utils.binary_reader import BinaryReader
 from .opcodes import OPCODES
+
 
 @dataclass
 class Opcode:
-  code: str
-  param1: int = 0
-  param2: int = 0
+    code: str
+    code_id: int
+    param1: int = 0
+    param2: int = 0
+    description: str = ""
+
 
 @dataclass
 class Script:
-  opcodes: List[Opcode]
+    opcodes: List[Opcode]
 
-@dataclass
-class ScriptEntity:
-  scripts: List[Script]
 
 @dataclass(init=False)
 class GenericScriptSection:
   offsets: List[int]
-  entities: List[ScriptEntity]
+  scripts: List[Script]
 
-  def __init__(self, stream: BytesIO):
-    self.offsets = self.parse_script_data_offsets(stream)
-    self.entities = self.parse_scripts(stream)
+  def __init__(self, stream: BytesIO) -> None:
+    self.offsets = self.parse_offsets(stream)
+    self.scripts = self.parse_scripts(stream)
 
-  
-  def parse_script_data_offsets(self, stream: BytesIO) -> List[int]:
-    offsets: List[int] = []
-    while True:
-      offset = BinaryReader.read_uint32(stream)
-      if offset == 0:
-        break
-      offsets.append(offset)
-
-    return offsets
-
-  def parse_scripts(self, stream: BytesIO) -> List[ScriptEntity]:
-    entities: List[ScriptEntity] = []
-    for offset in self.offsets:
-      stream.seek(offset)
-      script = ScriptEntity(scripts=[])
-      current_script = Script(opcodes=[])
+  def parse_offsets(self, stream: BytesIO) -> List[int]:
+      offsets: List[int] = []
       while True:
-        opcode = BinaryReader.read_int16(stream)
-        if opcode == 0:
-          break
-        param1 = BinaryReader.read_uint8(stream)
-        param2 = BinaryReader.read_uint8(stream)
-        if opcode == -255:
-          if len(current_script.opcodes) > 0:
-            script.scripts.append(current_script)
-          current_script = Script(opcodes=[])
-
-        current_script.opcodes.append(Opcode(code=OPCODES.get(opcode, {"opcode": "UNRECOGNISED"})["opcode"], param1=param1, param2=param2))
-
-      entities.append(script)
+          offset = BinaryReader.read_uint32(stream)
+          if offset == 0:
+              break
+          offsets.append(offset)
+      return offsets
+  
+  def parse_scripts(self, stream: BytesIO) -> List[Script]:
+    scripts: List[Script] = []
+    for i, offset in enumerate(self.offsets):
+      stream.seek(offset)
+      script = Script(opcodes=[])
+      
+      next_offset = self.offsets[i + 1] if i + 1 < len(self.offsets) else len(stream.getbuffer())
+      script_data_size = next_offset - offset
+      
+      while stream.tell() < offset + script_data_size:
+        opcode = self.parse_opcode(stream)
+        script.opcodes.append(opcode)
+        if opcode.code_id == -234:
+            break
+      scripts.append(script)
+    return scripts
     
-    return entities
+  def parse_opcode(self, stream: BytesIO) -> Opcode:
+      code_id = BinaryReader.read_int16(stream)
+      param1 = BinaryReader.read_uint8(stream)
+      param2 = BinaryReader.read_uint8(stream)
+      return Opcode(
+          code=OPCODES.get(code_id, {"opcode": "UNRECOGNISED"})["opcode"],
+          code_id=code_id,
+          param1=param1,
+          param2=param2,
+          description=OPCODES.get(code_id, {"description": ""})["description"],
+      )
