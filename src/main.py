@@ -6,15 +6,27 @@ from sections.section_3 import Section3
 from sections.section_4 import Section4
 from sections.section_5 import Section5
 from sections.section_6 import Section6
-from sections.section_10 import Section10
-from sections.section_16 import Section16
 from sections.section_7 import Section7
 from sections.section_8 import Section8
 from sections.section_9 import Section9
+from sections.section_10 import Section10
 from sections.section_11 import Section11
 from sections.section_12 import Section12
 from sections.section_13 import Section13
 from sections.section_15 import Section15
+from sections.section_16 import Section16
+from sections.section_18 import Section18
+from sections.section_19 import Section19
+from sections.section_20 import Section20
+from sections._unused_section_21 import UnusedSection21
+from sections._unused_section_22 import UnusedSection22
+from sections._unused_section_23 import UnusedSection23
+from sections._unused_section_24 import UnusedSection24
+from sections._unused_section_25 import UnusedSection25
+from sections._unused_section_26 import UnusedSection26
+from sections._unused_section_27 import UnusedSection27
+from sections.section_28 import Section28
+from sections.section_29 import Section29
 from sections.section_31 import Section31
 from sections.section_34 import Section34
 from sections.section_36 import Section36
@@ -72,8 +84,8 @@ def process_file(filepath: str) -> None:
     print("Section 11: Vehicle Warp Scripts")
     vehicle_warp_scripts = Section11(file_header.sections[11])
 
-    print("Section 12: Warp Landing Positions")
-    warp_landing_positions = Section12(file_header.sections[12])
+    print("Section 12: Train Exit Positions")
+    train_exit_positions = Section12(file_header.sections[12])
 
     print("Section 13: Dialog Texts")
     dialog_text = Section13(file_header.sections[13])
@@ -85,23 +97,48 @@ def process_file(filepath: str) -> None:
     print("Section 16: Unknown")
     unknown = Section16(file_header.sections[16])
 
+    print("Section 18: Region Location IDs")
+    region_location_ids = Section18(file_header.sections[18])
+    for i, region_id in enumerate(region_location_ids.region_location_ids):
+        print(f"Region {i}: Location ID {region_id}")
+
+    print("Section 19: AKAO Frame Headers")
+    akao_frame_headers = Section19(file_header.sections[19])
+
+    print("Section 20: AKAO")
+    akao = Section20(file_header.sections[20])
+
+    UnusedSection21(file_header.sections[21])
+    UnusedSection22(file_header.sections[22])
+    UnusedSection23(file_header.sections[23])
+    UnusedSection24(file_header.sections[24])
+    UnusedSection25(file_header.sections[25])
+    UnusedSection26(file_header.sections[26])
+    UnusedSection27(file_header.sections[27])
+
+    print("Section 28: Water Block")
+    water_block = Section28(file_header.sections[28])
+
+    print("Section 29: Animation Frame Data")
+    animation_frame_data = Section29(file_header.sections[29])
+
     print("Section 31: Location Names")
     location_names = Section31(file_header.sections[31])
 
     print("Section 34: Draw Points")
     draw_points = Section34(file_header.sections[34])
 
+    event_scripts = Section36(file_header.sections[36])
+
     print("Section 41: Object Textures")
     object_textures = Section41(file_header.sections[41])
-    
+
     print("Exporting models and textures...")
     for i, model in enumerate(models.models):
       texture = object_textures.textures[i]
       #Section15.export_model_to_obj(model, f"../output/models/model_{i}.obj", texture)
       #texture.save_png(f"../output/textures/texture_{i}.png")
       #print(f"Exported model_{i}.obj with texture_{i}.png")
-
-    event_scripts = Section36(file_header.sections[36])
 
 if __name__ == "__main__":
   test_file_path = "../wmsetus.obj"
