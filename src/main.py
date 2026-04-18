@@ -1,4 +1,10 @@
 from file_header import FileHeader
+from sections.section_0 import Section0
+from sections.section_1 import Section1
+from sections.section_2 import Section2
+from sections.section_3 import Section3
+from sections.section_4 import Section4
+from sections.section_5 import Section5
 from sections.section_10 import Section10
 from sections.section_16 import Section16
 from sections.section_7 import Section7
@@ -27,6 +33,24 @@ def process_file(filepath: str) -> None:
         print(f"Offset {i}: {offset}")
 
     ## Remember, zero indexed! Section 13 in Wiki is section 12 here.
+    print("Section 0: Encounter ID Supplier")
+    encounter_id_supplier = Section0(file_header.sections[0])
+
+    print("Section 1: World Map Regions")
+    world_map_regions = Section1(file_header.sections[1])
+
+    print("Section 2: Encounter Flags")
+    encounter_flags = Section2(file_header.sections[2])
+
+    print("Section 3: World Map Encounters")
+    world_map_encounters = Section3(file_header.sections[3])
+
+    print("Section 4: Lunar Cry Encounter Flags")
+    lunar_cry_flags = Section4(file_header.sections[4])
+
+    print("Section 5: Lunar Cry Encounters")
+    lunar_cry_encounters = Section5(file_header.sections[5])
+
     print("Section 7: Player Location Scripts")
     player_location_scripts = Section7(file_header.sections[7])
 
