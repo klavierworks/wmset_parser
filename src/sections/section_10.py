@@ -9,7 +9,7 @@ class EntityPosition:
     y: int
     z: int
     yaw: int
-    unused_angle: int
+    pitch: int
 
 @dataclass(init=False)
 class Section10:
@@ -26,10 +26,10 @@ class Section10:
             x = BinaryReader.read_int32(stream)
             y = BinaryReader.read_int32(stream)
             z = BinaryReader.read_int32(stream)
-            angle_lo = BinaryReader.read_int16(stream)
-            angle_hi = BinaryReader.read_int16(stream)
+            yaw = BinaryReader.read_int16(stream)
+            pitch = BinaryReader.read_int16(stream)
             positions.append(EntityPosition(
                 x=x, y=y, z=z,
-                yaw=angle_lo, unused_angle=angle_hi,
+                yaw=yaw, pitch=pitch,
             ))
         return positions

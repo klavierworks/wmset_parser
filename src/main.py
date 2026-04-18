@@ -5,11 +5,14 @@ from sections.section_2 import Section2
 from sections.section_3 import Section3
 from sections.section_4 import Section4
 from sections.section_5 import Section5
+from sections.section_6 import Section6
 from sections.section_10 import Section10
 from sections.section_16 import Section16
 from sections.section_7 import Section7
+from sections.section_8 import Section8
 from sections.section_9 import Section9
 from sections.section_11 import Section11
+from sections.section_12 import Section12
 from sections.section_13 import Section13
 from sections.section_15 import Section15
 from sections.section_31 import Section31
@@ -51,8 +54,14 @@ def process_file(filepath: str) -> None:
     print("Section 5: Lunar Cry Encounters")
     lunar_cry_encounters = Section5(file_header.sections[5])
 
+    print("Section 6: Polygon Texture Lookup")
+    polygon_texture_lookup = Section6(file_header.sections[6])
+
     print("Section 7: Player Location Scripts")
     player_location_scripts = Section7(file_header.sections[7])
+
+    print("Section 8: Field Landing Positions")
+    field_landing_positions = Section8(file_header.sections[8])
 
     print("Section 9: Entity Spawn Scripts")
     entity_spawn_scripts = Section9(file_header.sections[9])
@@ -62,7 +71,10 @@ def process_file(filepath: str) -> None:
 
     print("Section 11: Vehicle Warp Scripts")
     vehicle_warp_scripts = Section11(file_header.sections[11])
-    
+
+    print("Section 12: Warp Landing Positions")
+    warp_landing_positions = Section12(file_header.sections[12])
+
     print("Section 13: Dialog Texts")
     dialog_text = Section13(file_header.sections[13])
 
