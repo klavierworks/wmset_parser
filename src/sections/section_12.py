@@ -21,7 +21,6 @@ class Section12:
     def parse_positions(self, stream: BytesIO) -> List[TrainExitPosition]:
         record_count = (len(stream.getbuffer()) - 4) // 12
         positions: List[TrainExitPosition] = []
-        stream.seek(0)
         for _ in range(record_count):
             x = BinaryReader.read_int32(stream)
             y = BinaryReader.read_int32(stream)

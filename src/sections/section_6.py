@@ -18,7 +18,6 @@ class Section6:
     def parse_entries(self, stream: BytesIO) -> List[TextureLookup]:
         record_count = (len(stream.getbuffer()) - 4) // 4
         entries: List[TextureLookup] = []
-        stream.seek(0)
         for _ in range(record_count):
             tpage = BinaryReader.read_uint16(stream)
             clut = BinaryReader.read_uint16(stream)

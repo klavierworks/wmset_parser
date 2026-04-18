@@ -17,7 +17,6 @@ class Section0:
         self.entries = self.parse_entries(stream)
 
     def parse_entries(self, stream: BytesIO) -> List[EncounterIdSupplierEntry]:
-        stream.seek(0)
         entries_size = BinaryReader.read_uint32(stream)
         entry_count = entries_size // 4
         entries: List[EncounterIdSupplierEntry] = []

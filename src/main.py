@@ -13,8 +13,10 @@ from sections.section_10 import Section10
 from sections.section_11 import Section11
 from sections.section_12 import Section12
 from sections.section_13 import Section13
+from sections._unused_section_14 import UnusedSection14
 from sections.section_15 import Section15
 from sections.section_16 import Section16
+from sections.section_17 import Section17
 from sections.section_18 import Section18
 from sections.section_19 import Section19
 from sections.section_20 import Section20
@@ -90,17 +92,21 @@ def process_file(filepath: str) -> None:
     print("Section 13: Dialog Texts")
     dialog_text = Section13(file_header.sections[13])
 
+    print("Section 14: Unused")
+    UnusedSection14(file_header.sections[14])
+
     print(f"Section 15: Models")
     models = Section15(file_header.sections[15])
     print(f"Models: {len(models.models)} model(s)")
 
-    print("Section 16: Unknown")
-    unknown = Section16(file_header.sections[16])
+    print("Section 16: Animated Texture Descriptors")
+    animated_textures = Section16(file_header.sections[16])
+
+    print("Section 17: Encounter Formation Table")
+    encounter_formations = Section17(file_header.sections[17])
 
     print("Section 18: Region Location IDs")
     region_location_ids = Section18(file_header.sections[18])
-    for i, region_id in enumerate(region_location_ids.region_location_ids):
-        print(f"Region {i}: Location ID {region_id}")
 
     print("Section 19: AKAO Frame Headers")
     akao_frame_headers = Section19(file_header.sections[19])
@@ -108,6 +114,7 @@ def process_file(filepath: str) -> None:
     print("Section 20: AKAO")
     akao = Section20(file_header.sections[20])
 
+    print("Sections 21-27: Unused")
     UnusedSection21(file_header.sections[21])
     UnusedSection22(file_header.sections[22])
     UnusedSection23(file_header.sections[23])
@@ -128,6 +135,7 @@ def process_file(filepath: str) -> None:
     print("Section 34: Draw Points")
     draw_points = Section34(file_header.sections[34])
 
+    print("Section 36: Event Scripts")
     event_scripts = Section36(file_header.sections[36])
 
     print("Section 41: Object Textures")
