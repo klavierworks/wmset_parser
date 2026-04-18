@@ -1,5 +1,4 @@
 from file_header import FileHeader
-import file_header
 from sections.section_0 import Section0
 from sections.section_1 import Section1
 from sections.section_2 import Section2
@@ -42,6 +41,12 @@ from sections.section_38 import Section38
 from sections.section_39 import Section39
 from sections.section_40 import Section40
 from sections.section_41 import Section41
+from sections.section_42 import Section42
+from sections.section_43 import Section43
+from sections.section_44 import Section44
+from sections.section_45 import Section45
+from sections.section_46 import Section46
+from sections.section_47 import Section47
 import os
 
 ## IMPORTANT NOTE: in documentation sections are 1 indexed, in code they are 0 indexed. So section 1 in docs is section 0 in code.
@@ -173,6 +178,24 @@ def process_file(filepath: str) -> None:
 
     print("Section 41: Object Textures")
     object_textures = Section41(file_header.sections[41])
+
+    print("Section 42: AKAO Sound/Music")
+    section_42 = Section42(file_header.sections[42])
+
+    print("Section 43: AKAO Music")
+    section_43 = Section43(file_header.sections[43])
+
+    print("Section 44: AKAO Sound/Music")
+    section_44 = Section44(file_header.sections[44])
+
+    print("Section 45: AKAO Sound/Music")
+    section_45 = Section45(file_header.sections[45])
+
+    print("Section 46: AKAO Sound/Music")
+    section_46 = Section46(file_header.sections[46])
+
+    print("Section 47: AKAO Sound/Music")
+    section_47 = Section47(file_header.sections[47])
 
     print("Exporting models and textures...")
     for i, model in enumerate(models.models):

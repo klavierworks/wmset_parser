@@ -2,5 +2,5 @@ from dataclasses import dataclass
 from .generic_akao_section import GenericAkaoSection
 
 @dataclass(init=False)
-class Section20(GenericAkaoSection):
+class Section42(GenericAkaoSection):
     pass
