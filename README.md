@@ -1,10 +1,10 @@
-### wmset.obj parser
+### Worldmap Parser
 
+Parses wmsetxx.obj, wmx.obj and texl.obj – the data files that contain the world map for Final Fantasy VIII.
 
-WIP, feel free to contribute sections.
+These files should be placed in the root.
 
-Currently parses all sections.
+Exports textures as pngs and meshes as obj/mtl/png to ./output
 
-Has support for exporting textures as pngs and meshes as obj/mtl/png to ./output
+Exports the large world map as a .glb.
 
-It looks for a `wmsetus.obj` file in the root, currently

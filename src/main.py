@@ -142,7 +142,7 @@ def process_file(filepath: str) -> None:
 
     print("Section 29: Animation Frame Data")
     animation_frame_data = Section29(file_header.sections[29])
-    
+
     print("Section 30: Animation Descriptors?")
     animation_descriptors = Section30(file_header.sections[30])
 

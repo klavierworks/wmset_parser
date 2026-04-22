@@ -7,3 +7,6 @@ INPUT
 output
 
 wmset*.obj
+ida-mcp
+texl.obj
+wmx.obj
