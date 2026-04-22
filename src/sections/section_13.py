@@ -7,7 +7,7 @@ from utils.char_table import CharTable
 @dataclass(init=False)
 class Section13:
   offsets: List[int]
-  location_names: List[str]
+  dialog: List[str]
 
   def __init__(self, stream: BytesIO):
     self.offsets = self.parse_text_offsets(stream)
