@@ -47,10 +47,11 @@ from sections.section_44 import Section44
 from sections.section_45 import Section45
 from sections.section_46 import Section46
 from sections.section_47 import Section47
+from wmx.main import process_wmx
 import os
 
 ## IMPORTANT NOTE: in documentation sections are 1 indexed, in code they are 0 indexed. So section 1 in docs is section 0 in code.
-def process_file(filepath: str) -> None:
+def process_file(filepath: str) -> tuple[Section16, Section40]:
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"File {filepath} does not exist")
 
@@ -203,8 +204,25 @@ def process_file(filepath: str) -> None:
       #Section15.export_model_to_obj(model, f"../output/models/model_{i}.obj", texture)
       #texture.save_png(f"../output/textures/texture_{i}.png")
       #print(f"Exported model_{i}.obj with texture_{i}.png")
+      
+    
+    ## worldmap
+    return (animated_textures, palette_animations)
+    
 
 if __name__ == "__main__":
-  test_file_path = "../wmsetus.obj"
   os.system('cls' if os.name == 'nt' else 'clear')
-  process_file(test_file_path)
+  base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+  wmset_path = os.path.join(base_dir, "wmsetus.obj")
+  wmx_path = os.path.join(base_dir, "wmx.obj")
+  texl_path = os.path.join(base_dir, "texl.obj")
+  output_path = os.path.join(base_dir, "output", "wmx.glb")
+  animated_textures, palette_animations = process_file(wmset_path)
+  process_wmx(
+      wmx_path,
+      texl_path,
+      wmset_path,
+      output_path,
+      animated_textures=animated_textures,
+      palette_animations=palette_animations,
+  )

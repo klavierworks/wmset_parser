@@ -7,6 +7,10 @@ from PIL import Image
 from pygltflib import (
     GLTF2,
     Accessor,
+    Animation,
+    AnimationChannel,
+    AnimationChannelTarget,
+    AnimationSampler,
     Asset,
     Buffer,
     BufferView,
@@ -23,12 +27,18 @@ from pygltflib import (
 )
 
 from file_header import FileHeader
+from sections.section_16 import Section16
 from sections.section_37 import Section37
 from sections.section_38 import Section38
+from sections.section_40 import Section40
 from wmx.atlas import (
     build_land_atlas,
     build_road_composite,
-    build_sea_composite,
+)
+from wmx.sea_anim import (
+    SEA_ANIM_FRAME_COUNT,
+    SEA_ANIM_PERIOD_SECONDS,
+    build_sea_animation_sheet,
 )
 from wmx.parser import SEGMENT_GRID_COLS, WORLD_SEGMENT_COUNT, WmxFile, WmxSegment
 from wmx.segment_mesh import (
@@ -134,11 +144,23 @@ def _new_material(
     name: str,
     texture_idx: int,
     alpha_mode: str,
+    *,
+    uv_scale: Optional[Tuple[float, float]] = None,
 ) -> int:
+    tex_info: TextureInfo = TextureInfo(index=texture_idx, texCoord=0)
+    if uv_scale is not None:
+        # KHR_texture_transform lets us sample only one frame of the sprite
+        # sheet; the animation rewrites `offset.x` each tick to step frames.
+        tex_info.extensions = {
+            "KHR_texture_transform": {
+                "offset": [0.0, 0.0],
+                "scale": [uv_scale[0], uv_scale[1]],
+            }
+        }
     mat = Material(
         name=name,
         pbrMetallicRoughness=PbrMetallicRoughness(
-            baseColorTexture=TextureInfo(index=texture_idx, texCoord=0),
+            baseColorTexture=tex_info,
             baseColorFactor=[1.0, 1.0, 1.0, 1.0],
             metallicFactor=0.0,
             roughnessFactor=1.0,
@@ -250,7 +272,9 @@ def export_wmx_to_gltf(
     wmx: WmxFile,
     texl_path: str,
     output_glb_path: str,
-    wmset_path: Optional[str] = None,
+    wmset_path: str,
+    animated_textures: Section16,
+    palette_animations: Section40,
 ) -> None:
     output_dir = os.path.dirname(output_glb_path) or "."
     os.makedirs(output_dir, exist_ok=True)
@@ -258,8 +282,6 @@ def export_wmx_to_gltf(
     print(f"Parsing texl.obj from {texl_path}...")
     tims = parse_texl(texl_path)
 
-    if wmset_path is None:
-        raise ValueError("wmset_path is required to build sea/road composites")
     print(f"Parsing wmsetus.obj from {wmset_path}...")
     world_tex, road_tex = _load_wmset_tims(wmset_path)
 
@@ -298,16 +320,35 @@ def export_wmx_to_gltf(
         gltf.textures.append(Texture(sampler=sampler_clamp, source=image_idx))
         return tex_idx
 
-    def register_material(kind: str, opaque_name: str, tex_idx: int, alpha_used: bool) -> None:
-        material_indices[((kind, 0), False)] = _new_material(gltf, opaque_name, tex_idx, "OPAQUE")
+    def register_material(
+        kind: str,
+        opaque_name: str,
+        tex_idx: int,
+        alpha_used: bool,
+        uv_scale: Optional[Tuple[float, float]] = None,
+    ) -> None:
+        material_indices[((kind, 0), False)] = _new_material(
+            gltf, opaque_name, tex_idx, "OPAQUE", uv_scale=uv_scale
+        )
         if alpha_used:
-            material_indices[((kind, 0), True)] = _new_material(gltf, f"{opaque_name}_alpha", tex_idx, "MASK")
+            material_indices[((kind, 0), True)] = _new_material(
+                gltf, f"{opaque_name}_alpha", tex_idx, "MASK", uv_scale=uv_scale
+            )
 
     print("Building land gridImage atlas...")
     register_material("land", "land", add_texture("atlas_land", build_land_atlas(tims)), land_alpha_used)
 
-    print("Building sea composite (Sea1..Sea5 + Cascade + Beach1/Beach2)...")
-    register_material("water", "water", add_texture("atlas_sea", build_sea_composite(world_tex)), water_alpha_used)
+    print(f"Building animated sea sheet ({SEA_ANIM_FRAME_COUNT} frames)...")
+    sea_sheet, sea_frame_count = build_sea_animation_sheet(
+        world_tex, animated_textures, palette_animations, wmset_path
+    )
+    water_uv_scale = (1.0 / sea_frame_count, 1.0)
+    register_material(
+        "water", "water",
+        add_texture("atlas_sea", sea_sheet),
+        water_alpha_used,
+        uv_scale=water_uv_scale,
+    )
 
     print("Building road composite...")
     register_material("road", "road", add_texture("atlas_road", build_road_composite(road_tex)), road_alpha_used)
@@ -362,9 +403,75 @@ def export_wmx_to_gltf(
         else:
             world_root.children.append(node_idx)
 
+    _add_sea_uv_animation(
+        gltf, builder, material_indices, sea_frame_count, SEA_ANIM_PERIOD_SECONDS
+    )
+
     builder.align()
     gltf.buffers = [Buffer(byteLength=len(builder.blob))]
     gltf.set_binary_blob(bytes(builder.blob))
 
     print(f"Writing {output_glb_path} ({total_verts} vertices, {total_tris} triangles)...")
     gltf.save_binary(output_glb_path)
+
+
+def _add_sea_uv_animation(
+    gltf: GLTF2,
+    builder: "_BufferBuilder",
+    material_indices: Dict[Tuple[MaterialKey, bool], int],
+    frame_count: int,
+    period_seconds: float,
+) -> None:
+    """Attach a STEP animation that walks KHR_texture_transform.offset.x across
+    the N sea-sheet frames. Targeted via KHR_animation_pointer, one channel
+    per water material (opaque + optional MASK variant share the animation)."""
+    water_materials = [
+        material_indices[key]
+        for key in (((("water", 0), False)), ((("water", 0), True)))
+        if key in material_indices
+    ]
+    if not water_materials or frame_count < 2:
+        return
+
+    # N+1 keyframes with a final wrap back to offset 0 so every frame displays
+    # for a full dt before the loop restarts. With only N keyframes the last
+    # frame sits at t=duration (the loop point) and flashes for zero seconds.
+    key_count = frame_count + 1
+    dt = period_seconds / frame_count
+    times = [i * dt for i in range(key_count)]
+    offsets = [(i / frame_count, 0.0) for i in range(frame_count)] + [(0.0, 0.0)]
+
+    time_bytes = struct.pack(f"<{key_count}f", *times)
+    offset_bytes = _pack_floats(offsets, 2)
+    input_acc = builder.add_accessor(
+        time_bytes, COMP_F32, TYPE_SCALAR, key_count,
+        min_=[0.0], max_=[times[-1]],
+    )
+    output_acc = builder.add_accessor(
+        offset_bytes, COMP_F32, TYPE_VEC2, key_count,
+    )
+
+    # One shared sampler is enough — both channels read the same keyframes.
+    shared_sampler_idx = 0
+    samplers: List[AnimationSampler] = [AnimationSampler(
+        input=input_acc, output=output_acc, interpolation="STEP",
+    )]
+    channels: List[AnimationChannel] = []
+    for mat_idx in water_materials:
+        pointer = (
+            f"/materials/{mat_idx}/pbrMetallicRoughness/"
+            f"baseColorTexture/extensions/KHR_texture_transform/offset"
+        )
+        target = AnimationChannelTarget(path="pointer")
+        target.extensions = {"KHR_animation_pointer": {"pointer": pointer}}
+        channels.append(AnimationChannel(sampler=shared_sampler_idx, target=target))
+
+    if not gltf.animations:
+        gltf.animations = []
+    gltf.animations.append(Animation(
+        name="sea_cycle", channels=channels, samplers=samplers,
+    ))
+
+    used = set(gltf.extensionsUsed or [])
+    used.update(["KHR_texture_transform", "KHR_animation_pointer"])
+    gltf.extensionsUsed = sorted(used)
