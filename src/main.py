@@ -48,10 +48,12 @@ from sections.section_45 import Section45
 from sections.section_46 import Section46
 from sections.section_47 import Section47
 from wmx.main import process_wmx
+from wmx.atlas import save_tim_single_palette
+from export.exporter import Exporter
 import os
 
 ## IMPORTANT NOTE: in documentation sections are 1 indexed, in code they are 0 indexed. So section 1 in docs is section 0 in code.
-def process_file(filepath: str) -> tuple[Section16, Section40]:
+def process_file(filepath: str, output_dir: str) -> tuple[Section16, Section40]:
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"File {filepath} does not exist")
 
@@ -68,8 +70,8 @@ def process_file(filepath: str) -> tuple[Section16, Section40]:
     print("Section 0: Encounter ID Supplier")
     encounter_id_supplier = Section0(file_header.sections[0])
 
-    print("Section 1: World Map Regions")
-    world_map_regions = Section1(file_header.sections[1])
+    print("Section 1: World Map Regions Grid")
+    region_grid = Section1(file_header.sections[1])
 
     print("Section 2: Encounter Flags")
     encounter_flags = Section2(file_header.sections[2])
@@ -201,11 +203,15 @@ def process_file(filepath: str) -> tuple[Section16, Section40]:
     print("Exporting models and textures...")
     for i, model in enumerate(models.models):
       texture = object_textures.textures[i]
-      #Section15.export_model_to_obj(model, f"../output/models/model_{i}.obj", texture)
-      #texture.save_png(f"../output/textures/texture_{i}.png")
-      #print(f"Exported model_{i}.obj with texture_{i}.png")
-      
-    
+      Section15.export_model_to_obj(model, f"../output/models/model_{i}.obj", texture)
+      texture.save_png(f"../output/textures/texture_{i}.png")
+      print(f"Exported model_{i}.obj with texture_{i}.png")
+
+    Exporter(output_dir).export_textures("world", world_map_textures.textures)
+    sky_cloud_path = os.path.join(output_dir, "textures", "sky_cloud.png")
+    save_tim_single_palette(world_map_textures.textures[10], sky_cloud_path)
+    print(f"Saved sky cloud strip (FF8 alpha rule): {sky_cloud_path}")
+
     ## worldmap
     return (animated_textures, palette_animations)
     
@@ -216,13 +222,14 @@ if __name__ == "__main__":
   wmset_path = os.path.join(base_dir, "wmsetus.obj")
   wmx_path = os.path.join(base_dir, "wmx.obj")
   texl_path = os.path.join(base_dir, "texl.obj")
-  output_path = os.path.join(base_dir, "output", "wmx.glb")
-  animated_textures, palette_animations = process_file(wmset_path)
+  output_dir = os.path.join(base_dir, "output")
+  output_tiles_dir = os.path.join(output_dir, "tiles")
+  animated_textures, palette_animations = process_file(wmset_path, output_dir)
   process_wmx(
       wmx_path,
       texl_path,
       wmset_path,
-      output_path,
+      output_tiles_dir,
       animated_textures=animated_textures,
       palette_animations=palette_animations,
   )

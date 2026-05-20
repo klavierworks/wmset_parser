@@ -147,7 +147,7 @@ def _tim_pixel_pos(tim: TIM) -> Tuple[int, int]:
     return tim.header.img_x * mult, tim.header.img_y
 
 
-def _render_tim_single_palette(tim: TIM, palette_index: int = 0) -> Image.Image:
+def render_tim_single_palette(tim: TIM, palette_index: int = 0) -> Image.Image:
     """Render a TIM at its full image size using a single palette — used for
     sea/road tiles which are small (≤64×64) with just one palette each."""
     if not tim.header.has_palette:
@@ -163,6 +163,14 @@ def _render_tim_single_palette(tim: TIM, palette_index: int = 0) -> Image.Image:
     return Image.fromarray(pal[indices], mode="RGBA")
 
 
+def save_tim_single_palette(tim: TIM, path: str, palette_index: int = 0) -> None:
+    """Render one TIM with a specific CLUT (applying the FF8 alpha rule —
+    transparent iff the 16-bit colour word is 0x0000) and write it to `path`.
+    Unlike TIM.save_png, which uses the PSX STP bit for alpha, this produces
+    correct worldmap textures for cases like the sky cloud strip."""
+    render_tim_single_palette(tim, palette_index).save(path)
+
+
 def _build_composite(tims: List[TIM], width: int, height: int) -> Image.Image:
     """Mirrors deling's Map::composeTextureImage: paste each TIM at its VRAM
     pixel position relative to the union's top-left. Water/road polygon UVs
@@ -175,7 +183,7 @@ def _build_composite(tims: List[TIM], width: int, height: int) -> Image.Image:
     min_y = min(py for _, py in positions)
     out = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     for tim, (px, py) in zip(tims, positions):
-        tile = _render_tim_single_palette(tim)
+        tile = render_tim_single_palette(tim)
         out.paste(tile, (px - min_x, py - min_y))
     return out
 

@@ -234,28 +234,6 @@ def _segment_extras(seg_idx: int, segment: WmxSegment, is_variant: bool) -> dict
     return extras
 
 
-def _collect_alpha_usage(wmx: WmxFile) -> Tuple[bool, bool, bool]:
-    """Return (land_alpha_used, water_alpha_used, road_alpha_used). With sea/road
-    collapsed to one material each, we only need to know whether any transparent
-    poly of that kind exists to decide whether to emit the MASK variant."""
-    land_alpha = water_alpha = road_alpha = False
-    for segment in wmx.segments:
-        for block in segment.blocks:
-            if block is None:
-                continue
-            for poly in block.polygons:
-                transparent = bool(poly.flags1 & 0x14)
-                if not transparent:
-                    continue
-                if poly.is_water:
-                    water_alpha = True
-                elif poly.is_road:
-                    road_alpha = True
-                else:
-                    land_alpha = True
-    return land_alpha, water_alpha, road_alpha
-
-
 def _load_wmset_tims(wmset_path: str) -> Tuple[List, List]:
     """Return (world_textures, road_textures) TIM lists from wmsetus.obj. We
     need the TIM objects directly because the sea/road composites depend on
@@ -268,16 +246,24 @@ def _load_wmset_tims(wmset_path: str) -> Tuple[List, List]:
     return world_tex, road_tex
 
 
-def export_wmx_to_gltf(
+ATLAS_LAND_FILENAME = "atlas_land.png"
+ATLAS_SEA_FILENAME = "atlas_sea.png"
+ATLAS_ROAD_FILENAME = "atlas_road.png"
+
+
+def export_wmx_tiles(
     wmx: WmxFile,
     texl_path: str,
-    output_glb_path: str,
+    output_tiles_dir: str,
     wmset_path: str,
     animated_textures: Section16,
     palette_animations: Section40,
 ) -> None:
-    output_dir = os.path.dirname(output_glb_path) or "."
-    os.makedirs(output_dir, exist_ok=True)
+    """Export each WMX segment as a standalone GLB into output_tiles_dir.
+
+    Atlases (land/sea/road) are written once as PNGs and referenced by every
+    tile GLB via relative URI, so the per-tile files stay small."""
+    os.makedirs(output_tiles_dir, exist_ok=True)
 
     print(f"Parsing texl.obj from {texl_path}...")
     tims = parse_texl(texl_path)
@@ -285,8 +271,64 @@ def export_wmx_to_gltf(
     print(f"Parsing wmsetus.obj from {wmset_path}...")
     world_tex, road_tex = _load_wmset_tims(wmset_path)
 
-    land_alpha_used, water_alpha_used, road_alpha_used = _collect_alpha_usage(wmx)
-    print("Materials: 1 land (gridImage atlas) + 1 water (sea composite) + 1 road (road composite)")
+    print("Building land gridImage atlas...")
+    build_land_atlas(tims).save(os.path.join(output_tiles_dir, ATLAS_LAND_FILENAME))
+
+    print(f"Building animated sea sheet ({SEA_ANIM_FRAME_COUNT} frames)...")
+    sea_sheet, sea_frame_count = build_sea_animation_sheet(
+        world_tex, animated_textures, palette_animations, wmset_path
+    )
+    sea_sheet.save(os.path.join(output_tiles_dir, ATLAS_SEA_FILENAME))
+
+    print("Building road composite...")
+    build_road_composite(road_tex).save(os.path.join(output_tiles_dir, ATLAS_ROAD_FILENAME))
+
+    water_uv_scale = (1.0 / sea_frame_count, 1.0)
+
+    print(f"Writing {len(wmx.segments)} tile GLBs to {output_tiles_dir}...")
+    written = 0
+    for seg_idx in range(len(wmx.segments)):
+        segment = wmx.segments[seg_idx]
+        is_variant = seg_idx >= WORLD_SEGMENT_COUNT
+        primitives = build_segment_primitives(segment, seg_idx)
+        if not any(prim.indices for prim in primitives.values()):
+            continue
+
+        node_name = _segment_node_name(seg_idx, is_variant)
+        out_path = os.path.join(output_tiles_dir, f"{node_name}.glb")
+        _write_tile_glb(
+            out_path, seg_idx, segment, primitives, is_variant,
+            water_uv_scale, sea_frame_count,
+        )
+        written += 1
+    print(f"Wrote {written} tile GLBs")
+
+
+def _write_tile_glb(
+    output_path: str,
+    seg_idx: int,
+    segment: WmxSegment,
+    primitives: Dict[PrimitiveKey, "Primitive"],
+    is_variant: bool,
+    water_uv_scale: Tuple[float, float],
+    sea_frame_count: int,
+) -> None:
+    has_land = has_water = has_road = False
+    land_alpha = water_alpha = road_alpha = False
+    for pkey, prim in primitives.items():
+        if not prim.indices:
+            continue
+        kind = pkey[0][0]
+        transparent = pkey[1]
+        if kind == "water":
+            has_water = True
+            water_alpha = water_alpha or transparent
+        elif kind == "road":
+            has_road = True
+            road_alpha = road_alpha or transparent
+        else:
+            has_land = True
+            land_alpha = land_alpha or transparent
 
     gltf = GLTF2()
     gltf.asset = Asset(generator="worldmap_models wmx exporter", version="2.0")
@@ -301,8 +343,6 @@ def export_wmx_to_gltf(
     gltf.bufferViews = []
     gltf.accessors = []
 
-    # CLAMP everywhere: UVs stay inside their texture's native footprint
-    # (1024×1280 land, 256×128 sea, 192×64 road) so there's nothing to wrap.
     sampler_clamp = len(gltf.samplers)
     gltf.samplers.append(Sampler(
         magFilter=FILTER_NEAREST, minFilter=FILTER_NEAREST,
@@ -311,108 +351,73 @@ def export_wmx_to_gltf(
 
     builder = _BufferBuilder(gltf)
 
-    material_indices: Dict[Tuple[MaterialKey, bool], int] = {}
-
-    def add_texture(name: str, img) -> int:
-        img.save(os.path.join(output_dir, f"wmx_{name}.png"))
-        image_idx = builder.add_image(_png_bytes(img), name)
+    def add_external_texture(uri: str, name: str) -> int:
+        image_idx = len(gltf.images)
+        gltf.images.append(GLTFImage(uri=uri, name=name))
         tex_idx = len(gltf.textures)
         gltf.textures.append(Texture(sampler=sampler_clamp, source=image_idx))
         return tex_idx
 
+    material_indices: Dict[Tuple[MaterialKey, bool], int] = {}
+
     def register_material(
         kind: str,
-        opaque_name: str,
         tex_idx: int,
         alpha_used: bool,
         uv_scale: Optional[Tuple[float, float]] = None,
     ) -> None:
         material_indices[((kind, 0), False)] = _new_material(
-            gltf, opaque_name, tex_idx, "OPAQUE", uv_scale=uv_scale
+            gltf, kind, tex_idx, "OPAQUE", uv_scale=uv_scale
         )
         if alpha_used:
             material_indices[((kind, 0), True)] = _new_material(
-                gltf, f"{opaque_name}_alpha", tex_idx, "MASK", uv_scale=uv_scale
+                gltf, f"{kind}_alpha", tex_idx, "MASK", uv_scale=uv_scale
             )
 
-    print("Building land gridImage atlas...")
-    register_material("land", "land", add_texture("atlas_land", build_land_atlas(tims)), land_alpha_used)
+    if has_land:
+        register_material("land", add_external_texture(ATLAS_LAND_FILENAME, "atlas_land"), land_alpha)
+    if has_water:
+        register_material(
+            "water", add_external_texture(ATLAS_SEA_FILENAME, "atlas_sea"),
+            water_alpha, uv_scale=water_uv_scale,
+        )
+    if has_road:
+        register_material("road", add_external_texture(ATLAS_ROAD_FILENAME, "atlas_road"), road_alpha)
 
-    print(f"Building animated sea sheet ({SEA_ANIM_FRAME_COUNT} frames)...")
-    sea_sheet, sea_frame_count = build_sea_animation_sheet(
-        world_tex, animated_textures, palette_animations, wmset_path
-    )
-    water_uv_scale = (1.0 / sea_frame_count, 1.0)
-    register_material(
-        "water", "water",
-        add_texture("atlas_sea", sea_sheet),
-        water_alpha_used,
-        uv_scale=water_uv_scale,
-    )
+    node_name = _segment_node_name(seg_idx, is_variant)
+    node = Node(name=node_name, extras=_segment_extras(seg_idx, segment, is_variant))
 
-    print("Building road composite...")
-    register_material("road", "road", add_texture("atlas_road", build_road_composite(road_tex)), road_alpha_used)
+    gltf_primitives: List[GLTFPrimitive] = []
+    for pkey, prim in primitives.items():
+        if not prim.indices:
+            continue
+        mat_idx = material_indices.get(pkey)
+        if mat_idx is None:
+            mat_idx = material_indices.get((pkey[0], False))
+            if mat_idx is None:
+                continue
+        gltf_primitives.append(_primitive_to_gltf(prim, builder, mat_idx))
 
-    world_root = Node(name="WorldMap", children=[])
-    world_root_idx = len(gltf.nodes)
-    gltf.nodes.append(world_root)
-    gltf.scenes[0].nodes.append(world_root_idx)
+    if gltf_primitives:
+        mesh_idx = len(gltf.meshes)
+        gltf.meshes.append(Mesh(name=f"{node_name}_mesh", primitives=gltf_primitives))
+        node.mesh = mesh_idx
 
-    variants_root = Node(name="StoryVariants", children=[])
-    variants_root_idx = len(gltf.nodes)
-    gltf.nodes.append(variants_root)
-    world_root.children.append(variants_root_idx)
+    node_idx = len(gltf.nodes)
+    gltf.nodes.append(node)
+    gltf.scenes[0].nodes.append(node_idx)
 
-    total_verts = 0
-    total_tris = 0
-
-    print(f"Building {len(wmx.segments)} segments...")
-    for seg_idx in range(len(wmx.segments)):
-        segment = wmx.segments[seg_idx]
-        is_variant = seg_idx >= WORLD_SEGMENT_COUNT
-        primitives = build_segment_primitives(segment, seg_idx)
-
-        node_name = _segment_node_name(seg_idx, is_variant)
-        node = Node(name=node_name, extras=_segment_extras(seg_idx, segment, is_variant))
-
-        if primitives:
-            gltf_primitives: List[GLTFPrimitive] = []
-            for pkey, prim in primitives.items():
-                if not prim.indices:
-                    continue
-                mat_idx = material_indices.get(pkey)
-                if mat_idx is None:
-                    # Fall back to the opaque variant of the same kind when a
-                    # MASK variant wasn't created (no transparent polys of that
-                    # kind exist, so the alpha material was skipped).
-                    mat_idx = material_indices.get((pkey[0], False))
-                    if mat_idx is None:
-                        continue
-                gltf_primitives.append(_primitive_to_gltf(prim, builder, mat_idx))
-                total_verts += len(prim.positions)
-                total_tris += len(prim.indices) // 3
-            if gltf_primitives:
-                mesh_idx = len(gltf.meshes)
-                gltf.meshes.append(Mesh(name=f"{node_name}_mesh", primitives=gltf_primitives))
-                node.mesh = mesh_idx
-
-        node_idx = len(gltf.nodes)
-        gltf.nodes.append(node)
-        if is_variant:
-            variants_root.children.append(node_idx)
-        else:
-            world_root.children.append(node_idx)
-
-    _add_sea_uv_animation(
-        gltf, builder, material_indices, sea_frame_count, SEA_ANIM_PERIOD_SECONDS
-    )
+    if has_water:
+        _add_sea_uv_animation(
+            gltf, builder, material_indices, sea_frame_count, SEA_ANIM_PERIOD_SECONDS,
+            dummy_node_idx=node_idx,
+        )
 
     builder.align()
     gltf.buffers = [Buffer(byteLength=len(builder.blob))]
     gltf.set_binary_blob(bytes(builder.blob))
 
-    print(f"Writing {output_glb_path} ({total_verts} vertices, {total_tris} triangles)...")
-    gltf.save_binary(output_glb_path)
+    gltf.save_binary(output_path)
 
 
 def _add_sea_uv_animation(
@@ -421,6 +426,8 @@ def _add_sea_uv_animation(
     material_indices: Dict[Tuple[MaterialKey, bool], int],
     frame_count: int,
     period_seconds: float,
+    *,
+    dummy_node_idx: int,
 ) -> None:
     """Attach a STEP animation that walks KHR_texture_transform.offset.x across
     the N sea-sheet frames. Targeted via KHR_animation_pointer, one channel
@@ -462,7 +469,10 @@ def _add_sea_uv_animation(
             f"/materials/{mat_idx}/pbrMetallicRoughness/"
             f"baseColorTexture/extensions/KHR_texture_transform/offset"
         )
-        target = AnimationChannelTarget(path="pointer")
+        # node is ignored when path == "pointer" per KHR_animation_pointer, but
+        # tools like gltfjsx assume every channel targets a node and crash on
+        # undefined — point it at the world root as a harmless placeholder.
+        target = AnimationChannelTarget(node=dummy_node_idx, path="pointer")
         target.extensions = {"KHR_animation_pointer": {"pointer": pointer}}
         channels.append(AnimationChannel(sampler=shared_sampler_idx, target=target))
 
