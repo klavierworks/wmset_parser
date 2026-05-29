@@ -1,7 +1,7 @@
 import json
 import os
 from dataclasses import is_dataclass, asdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sections.generic_script_section import GenericScriptSection
 from sections.models.parse import Model
@@ -14,13 +14,22 @@ class Exporter:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    def export_models(self, models: List[Model], object_textures: List[TIM]) -> None:
+    def export_models(self, models: List[Optional[Model]], object_textures: List[TIM]) -> None:
         models_dir = os.path.join(self.output_dir, "models")
         os.makedirs(models_dir, exist_ok=True)
+
+        atlas_basename = "atlas.png"
+        atlas_path = os.path.join(models_dir, atlas_basename)
+        atlas = Section15.build_vram_atlas(object_textures)
+        atlas.save(atlas_path)
+        print(f"Saved VRAM atlas: {atlas_path}")
+
         for i, model in enumerate(models):
-            texture = object_textures[i]
+            if model is None:
+                print(f"Skipping model_{i}.obj (unparsable)")
+                continue
             obj_path = os.path.join(models_dir, f"model_{i}.obj")
-            Section15.export_model_to_obj(model, obj_path, texture)
+            Section15.export_model_to_obj(model, obj_path, atlas_basename)
             print(f"Exported model_{i}.obj")
 
     def export_textures(self, subfolder: str, textures: List[TIM]) -> None:

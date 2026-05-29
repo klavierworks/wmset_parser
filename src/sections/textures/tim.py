@@ -119,11 +119,13 @@ class TIM:
                     break
                     
                 word = palette_data[i] | (palette_data[i+1] << 8)
-                
+
                 # Extract BGR555 components
                 b = ((word >> 10) & 0x1F) / 31.0
                 g = ((word >>  5) & 0x1F) / 31.0
                 r = ( word        & 0x1F) / 31.0
+                # Paletted TIMs (object/model textures): STP bit marks transparent entries.
+                # The FF8 word==0 rule applies to 16bpp direct-color images (world atlas).
                 a = 0.0 if (word >> 15) else 1.0
                 
                 self.palette_colors.append((r, g, b, a))
@@ -167,11 +169,8 @@ class TIM:
         return True
       
       
-    def save_png(self, path: str):
-        """
-        Save the TIM image as a PNG.
-        Handles paletted (4bpp/8bpp) and direct 16-bit color images.
-        """
+    def to_image(self) -> Image.Image:
+        """Render the TIM to an RGBA PIL Image at its native image-pixel resolution."""
         width = self.header.img_w
         height = self.header.img_h
         img = Image.new("RGBA", (width, height))
@@ -181,8 +180,6 @@ class TIM:
         data = self.image_data
 
         if self.header.has_palette:
-            # Paletted image
-            num_pixels = width * height
             idx = 0
             if bpp == 0:
                 # 4bpp: 2 pixels per byte
@@ -221,10 +218,14 @@ class TIM:
                     b = ((word >> 10) & 0x1F) / 31.0
                     g = ((word >> 5) & 0x1F) / 31.0
                     r = (word & 0x1F) / 31.0
-                    a = 0 if (word >> 15) else 255
+                    a = 0 if word == 0 else 255
                     pixels[x, y] = (int(r*255), int(g*255), int(b*255), a)
                     idx += 2
+        return img
 
+    def save_png(self, path: str):
+        """Save the TIM image as a PNG."""
+        img = self.to_image()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         img.save(path)
         print(f"Saved TIM as PNG: {path}")

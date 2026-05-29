@@ -200,17 +200,64 @@ def process_file(filepath: str, output_dir: str) -> tuple[Section16, Section40]:
     print("Section 47: AKAO Sound/Music")
     music_section_47 = Section47(file_header.sections[47])
 
-    print("Exporting models and textures...")
-    for i, model in enumerate(models.models):
-      texture = object_textures.textures[i]
-      Section15.export_model_to_obj(model, f"../output/models/model_{i}.obj", texture)
-      texture.save_png(f"../output/textures/texture_{i}.png")
-      print(f"Exported model_{i}.obj with texture_{i}.png")
+    exporter = Exporter(output_dir)
 
-    Exporter(output_dir).export_textures("world", world_map_textures.textures)
+    print("Exporting models and object textures...")
+    exporter.export_models(models.models, object_textures.textures)
+    exporter.export_textures("objects", object_textures.textures)
+
+    print("Exporting world / road / world2 textures...")
+    exporter.export_textures("world", world_map_textures.textures)
+    exporter.export_textures("road", road_tracks_textures.textures)
+    exporter.export_textures("world2", one_world_map_texture.textures)
+
     sky_cloud_path = os.path.join(output_dir, "textures", "sky_cloud.png")
     save_tim_single_palette(world_map_textures.textures[10], sky_cloud_path)
     print(f"Saved sky cloud strip (FF8 alpha rule): {sky_cloud_path}")
+
+    print("Writing sections.json...")
+    # Texture/model sections (15, 37, 38, 39, 41) hold TIM/Model blobs that are
+    # already on disk as PNG/OBJ — including them would bloat sections.json and
+    # serialize raw BytesIO. Unused sections (14, 21-27) are skipped too.
+    sections: dict[str, object] = {
+        "section_0_encounter_id_supplier": encounter_id_supplier,
+        "section_1_region_grid": region_grid,
+        "section_2_encounter_flags": encounter_flags,
+        "section_3_world_map_encounters": world_map_encounters,
+        "section_4_lunar_cry_flags": lunar_cry_flags,
+        "section_5_lunar_cry_encounters": lunar_cry_encounters,
+        "section_6_polygon_texture_lookup": polygon_texture_lookup,
+        "section_7_player_location_scripts": Exporter.convert_script_section(player_location_scripts),
+        "section_8_field_landing_positions": field_landing_positions,
+        "section_9_entity_spawn_scripts": Exporter.convert_script_section(entity_spawn_scripts),
+        "section_10_entity_spawn_positions": entity_spawn_positions,
+        "section_11_vehicle_warp_scripts": Exporter.convert_script_section(vehicle_warp_scripts),
+        "section_12_train_exit_positions": train_exit_positions,
+        "section_13_dialog_text": dialog_text,
+        "section_16_animated_texture_descriptors": animated_textures,
+        "section_17_encounter_formations": encounter_formations,
+        "section_18_region_location_ids": region_location_ids,
+        "section_19_akao_frame_headers": akao_frame_headers,
+        "section_20_akao": akao,
+        "section_28_water_block": water_block,
+        "section_29_animation_frame_data": animation_frame_data,
+        "section_30_animation_descriptors": animation_descriptors,
+        "section_31_location_names": location_names,
+        "section_32_sky_color_zones": sky_color_zones,
+        "section_33_text_templates": text_templates,
+        "section_34_draw_points": draw_points,
+        "section_35_special_locations": special_locations,
+        "section_36_event_scripts": Exporter.convert_script_section(event_scripts),
+        "section_40_palette_animations": palette_animations,
+        "section_42_music": music_section_42,
+        "section_43_music": music_section_43,
+        "section_44_music": music_section_44,
+        "section_45_music": music_section_45,
+        "section_46_music": music_section_46,
+        "section_47_music": music_section_47,
+    }
+    exporter.export_sections_json(sections)
+    print(f"Saved sections.json to {os.path.join(output_dir, 'sections.json')}")
 
     ## worldmap
     return (animated_textures, palette_animations)
